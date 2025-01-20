@@ -1,3 +1,11 @@
+"""
+Module Name: main.py
+Author: Yoel Baer Buzgalo
+Created: 2025-01-19
+Description:
+    This module is the main file to run Tutoring Email app
+"""
+
 import os.path
 import base64
 import json
@@ -36,7 +44,9 @@ def authenticate():
     return creds
 
 def send_email(service, sender_name, sender_email, recipient_email, subject, body):
-    """Send an email using the Gmail API."""
+    """
+    Send an email using the Gmail API.
+    """
     message = {
         'raw': base64.urlsafe_b64encode(
             f"From: \"{sender_name} (RIT Student)\"<{sender_email}>\n"
@@ -61,7 +71,7 @@ def generate_body(sender_name, recipient_name, amount, students)->str:
         with open("gmail_signature.html", "r") as signature_file:
             signature = signature_file.read()
     except FileNotFoundError:
-        print("There was an error")
+        print("gmail_signature.html file could not be found")
         signature = ""
     
     body = f"""
@@ -77,12 +87,12 @@ def generate_body(sender_name, recipient_name, amount, students)->str:
     if len(students) > 0:
         body += "<p><b><u>More details:</b></u></p><ul>"
         for student in students:
-            body += f"<li>{student.to_string()}</li>"
+            body += f"<li>{str(student)}</li>"
         body += "</ul>"
 
     body += f"""
     <p>Please note that this is an auto-generated email. If you have any questions or need further details, please don't hesitate to reach out.</p>
-    <p>Thanks,<br>
+    <p>Best regards,<br>
     {sender_name}</p>
     """
 
