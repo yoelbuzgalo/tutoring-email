@@ -18,7 +18,7 @@ from datetime import datetime
 from student import Student
 
 # If modifying these SCOPES, delete the token.json file.
-SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.modify']
 
 def load_email_config(file_path="email_config.json"):
     with open(file_path, 'r') as config_file:
@@ -59,6 +59,8 @@ def send_email(service, sender_name, sender_email, recipient_email, subject, bod
     try:
         sent_message = service.users().messages().send(userId='me', body=message).execute()
         print(f"Message sent: {sent_message['id']}")
+        return sent_message['id']
+
     except HttpError as error:
         print(f"An error occurred: {error}")
 
@@ -100,28 +102,59 @@ def generate_body(sender_name, recipient_name, amount, students)->str:
 
     return body
 
+def get_label_id(service, name):
+    try:
+        results = service.users().labels().list(userId='me').execute()
+        labels = results.get('labels', [])
+        for label in labels:
+            if label['name'] == name:
+                return label['id']
+        print(f"Label '{name}' not found.")
+        return None
+    except HttpError as error:
+        print(f"An error occurred while fetching labels: {error}")
+        return None
+
+
+def attach_label(service, email_id, label_id):
+    if not email_id or not label_id:
+        print("Invalid email ID or label ID. Cannot attach label.")
+        return
+    try:
+        label_body = {
+            "removeLabelIds": [],
+            "addLabelIds": [label_id],
+        }
+        result = service.users().messages().modify(userId='me', id=email_id, body=label_body).execute()
+        print(f"Label successfully attached to email {email_id}.")
+    except HttpError as error:
+        print(f"An error occurred while attaching the label: {error}")
+
+
 def main():
     creds = authenticate()
     service = build('gmail', 'v1', credentials=creds)
     config = load_email_config("email_config.json")
+    label_id = get_label_id(service, config["label"])
 
-    subject = f"Tutor Shift Report - {datetime.now().strftime('%Y-%m-%d %I:%M %p %Z')}"
+    if label_id:
+        subject = f"Tutor Shift Report - {datetime.now().strftime('%Y-%m-%d %I:%M %p %Z')}"
+        amount = int(input("How many people were in the lab? "))
+        students = list()
 
-    amount = int(input("How many people were in the lab? "))
-    students = list()
+        if amount > 0:
+            
+            resp = int(input("How many did you tutor today? "))
 
-    if amount > 0:
-        
-        resp = int(input("How many did you tutor today? "))
+            if resp > 0:
+                for idx in range(1, resp+1):
+                    person_name = input(f"Enter person {idx} name: ")
+                    person_task = input(f"Topic covered with {person_name}: ")
+                    new_student = Student(person_name, person_task)
+                    students.append(new_student)
 
-        if resp > 0:
-            for idx in range(1, resp+1):
-                person_name = input(f"Enter person {idx} name: ")
-                person_task = input(f"Topic covered with {person_name}: ")
-                new_student = Student(person_name, person_task)
-                students.append(new_student)
-
-    send_email(service, config['sender']['name'], config['sender']['email'], config['recipient']['email'], subject, generate_body(config['sender']['name'], config['recipient']['name'], amount, students))
+        email_id = send_email(service, config['sender']['name'], config['sender']['email'], config['recipient']['email'], subject, generate_body(config['sender']['name'], config['recipient']['name'], amount, students))
+        attach_label(service, email_id, label_id)
 
 if __name__ == '__main__':
     main()    
